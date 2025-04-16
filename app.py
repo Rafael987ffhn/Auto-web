@@ -1,74 +1,72 @@
+import os
+import subprocess
+from flask import Flask, render_template, request, redirect, url_for
 import whisper
 from gtts import gTTS
-import subprocess
-import os
+from werkzeug.utils import secure_filename
 
-# Função para extrair áudio do vídeo com ffmpeg
-def extract_audio(video_path, audio_path):
-    try:
-        subprocess.run(["ffmpeg", "-i", video_path, "-q:a", "0", "-map", "a", audio_path, "-y"], check=True)
-        print("🎧 Áudio extraído com sucesso!")
-    except subprocess.CalledProcessError as e:
-        print(f"❌ Erro ao extrair áudio: {e}")
-        raise
+app = Flask(__name__)
 
-# Função para transcrição de áudio usando Whisper
+# Caminho para salvar vídeos e áudios
+UPLOAD_FOLDER = 'uploads'
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+
+# Função para extrair o áudio do vídeo
+def extract_audio(video_path):
+    audio_path = os.path.join(UPLOAD_FOLDER, "audio_original.wav")
+    cmd = ['ffmpeg', '-i', video_path, '-q:a', '0', '-map', 'a', audio_path, '-y']
+    subprocess.run(cmd, check=True)
+    return audio_path
+
+# Função para transcrição de áudio
 def transcribe_audio(audio_path):
-    try:
-        model = whisper.load_model("base")
-        result = model.transcribe(audio_path)
-        return result["text"]
-    except Exception as e:
-        print(f"❌ Erro na transcrição do áudio: {e}")
-        raise
+    model = whisper.load_model("base")  # ou "tiny" para mais rápido
+    result = model.transcribe(audio_path)
+    return result["text"]
 
-# Função para gerar áudio dublado com gTTS
-def generate_dubbed_audio(text, dubbed_audio_path):
-    try:
-        tts = gTTS(text=text, lang='pt-br')
-        tts.save(dubbed_audio_path)
-        print("🎤 Áudio dublado gerado com sucesso!")
-    except Exception as e:
-        print(f"❌ Erro ao gerar áudio dublado: {e}")
-        raise
+# Função para gerar áudio dublado
+def generate_dubbed_audio(text, lang='pt-br'):
+    tts = gTTS(text=text, lang=lang)
+    dubbed_audio_path = os.path.join(UPLOAD_FOLDER, "audio_dublado.mp3")
+    tts.save(dubbed_audio_path)
+    return dubbed_audio_path
 
-# Função para substituir o áudio original pelo dublado no vídeo
-def replace_audio_in_video(video_path, dubbed_audio_path, output_path):
-    try:
-        subprocess.run([
-            "ffmpeg", "-i", video_path, "-i", dubbed_audio_path, "-c:v", "copy",
-            "-map", "0:v:0", "-map", "1:a:0", "-shortest", output_path, "-y"
-        ], check=True)
-        print(f"🎬 Vídeo dublado salvo em: {output_path}")
-    except subprocess.CalledProcessError as e:
-        print(f"❌ Erro ao substituir áudio no vídeo: {e}")
-        raise
+# Função para substituir o áudio do vídeo
+def replace_audio_in_video(video_path, dubbed_audio_path):
+    output_video_path = os.path.join(UPLOAD_FOLDER, "video_dublado.mp4")
+    cmd = ['ffmpeg', '-i', video_path, '-i', dubbed_audio_path, '-c:v', 'copy', '-c:a', 'aac', '-strict', 'experimental', output_video_path]
+    subprocess.run(cmd, check=True)
+    return output_video_path
 
-# Função principal
-def dub_video(video_path, audio_path, dubbed_audio_path, output_path):
-    # 1. Extrair o áudio do vídeo
-    extract_audio(video_path, audio_path)
+@app.route('/')
+def index():
+    return render_template('index.html')
+
+@app.route('/processar', methods=['POST'])
+def processar():
+    if 'video' not in request.files:
+        return redirect(request.url)
+    video_file = request.files['video']
+    if video_file.filename == '':
+        return redirect(request.url)
     
-    # 2. Transcrição com Whisper
-    transcription = transcribe_audio(audio_path)
-    print("📝 Transcrição:", transcription)
-    
-    # 3. Gerar áudio dublado com gTTS
-    generate_dubbed_audio(transcription, dubbed_audio_path)
-    
-    # 4. Substituir áudio original pelo dublado
-    replace_audio_in_video(video_path, dubbed_audio_path, output_path)
-    
-    # 5. Limpeza de arquivos temporários
-    os.remove(audio_path)
-    os.remove(dubbed_audio_path)
-    print("🧹 Arquivos temporários removidos com sucesso!")
+    if video_file:
+        video_filename = secure_filename(video_file.filename)
+        video_path = os.path.join(app.config['UPLOAD_FOLDER'], video_filename)
+        video_file.save(video_path)
 
-# Caminhos dos arquivos
-video_path = "video.mp4"
-audio_path = "audio_original.wav"
-dubbed_audio_path = "audio_dublado.mp3"
-output_path = "video_dublado.mp4"
+        # Etapas do processamento
+        audio_path = extract_audio(video_path)
+        transcription = transcribe_audio(audio_path)
+        dubbed_audio_path = generate_dubbed_audio(transcription)
+        output_video_path = replace_audio_in_video(video_path, dubbed_audio_path)
 
-# Iniciar o processo de dublagem
-dub_video(video_path, audio_path, dubbed_audio_path, output_path)
+        return redirect(url_for('download', filename=output_video_path))
+
+@app.route('/download/<filename>')
+def download(filename):
+    return redirect(url_for('static', filename=filename))
+
+if __name__ == '__main__':
+    app.run(debug=True)
