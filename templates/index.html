@@ -1,27 +1,133 @@
 <!DOCTYPE html>
-<html lang="pt-br">
+<html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AutoDub - Upload de Vídeo</title>
+  <meta charset="UTF-8" />
+  <title>AutoDub</title>
+  <style>
+    body {
+      background-color: #111;
+      color: #f2f2f2;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      margin: 0;
+      padding: 0;
+    }
+
+    header {
+      background-color: #222;
+      padding: 20px;
+      text-align: center;
+    }
+
+    header h1 {
+      margin: 0;
+      font-size: 2.5rem;
+    }
+
+    main {
+      padding: 30px;
+      max-width: 800px;
+      margin: auto;
+    }
+
+    form {
+      background-color: #1e1e1e;
+      padding: 20px;
+      border-radius: 10px;
+    }
+
+    label {
+      display: block;
+      margin-top: 15px;
+      font-weight: bold;
+    }
+
+    input[type="file"],
+    select,
+    button {
+      width: 100%;
+      padding: 10px;
+      margin-top: 5px;
+      margin-bottom: 15px;
+      border-radius: 5px;
+      border: none;
+    }
+
+    button {
+      background-color: #0d6efd;
+      color: white;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background-color: #0b5ed7;
+    }
+
+    .video-preview {
+      margin-top: 30px;
+      text-align: center;
+    }
+
+    video {
+      width: 100%;
+      max-width: 720px;
+      border-radius: 10px;
+      margin-top: 15px;
+    }
+
+    footer {
+      margin-top: 50px;
+      text-align: center;
+      color: #888;
+      font-size: 0.9rem;
+    }
+  </style>
 </head>
 <body>
-    <h1>Upload de Vídeo</h1>
-    <form action="/processar" method="POST" enctype="multipart/form-data">
-        <label for="video">Escolha o vídeo:</label>
-        <input type="file" name="video" id="video" accept=".mp4,.avi,.mov,.mkv" required><br><br>
-        <input type="submit" value="Enviar">
+  <header>
+    <h1>AutoDub 🎙️</h1>
+    <p>Duble vídeos automaticamente com inteligência artificial</p>
+  </header>
+
+  <main>
+    <form action="/processar" method="post" enctype="multipart/form-data">
+      <label for="video">Selecionar vídeo:</label>
+      <input type="file" id="video" name="video" accept="video/*" required />
+
+      <label for="idioma">Idioma da dublagem:</label>
+      <select name="idioma" id="idioma" required>
+        <option value="pt">Português</option>
+        <option value="en">Inglês</option>
+        <option value="es">Espanhol</option>
+        <option value="fr">Francês</option>
+        <!-- Adicione mais idiomas se necessário -->
+      </select>
+
+      <button type="submit">Iniciar dublagem</button>
     </form>
 
-    <h2>Selecionar Idioma para a Dublagem</h2>
-    <form action="/selecionar_idioma" method="POST">
-        <label for="idioma">Escolha o idioma:</label>
-        <select name="idioma" id="idioma" required>
-            <option value="portugues">Português</option>
-            <option value="ingles">Inglês</option>
-            <option value="espanhol">Espanhol</option>
-        </select><br><br>
-        <input type="submit" value="Selecionar Idioma">
-    </form>
+    {% if original %}
+    <div class="video-preview">
+      <h2>🎞️ Vídeo Original</h2>
+      <video controls>
+        <source src="{{ url_for('static', filename=original) }}" type="video/mp4" />
+        Seu navegador não suporta vídeo.
+      </video>
+    </div>
+    {% endif %}
+
+    {% if dublado %}
+    <div class="video-preview">
+      <h2>✅ Vídeo Dublado</h2>
+      <video controls>
+        <source src="{{ url_for('static', filename=dublado) }}" type="video/mp4" />
+        Seu navegador não suporta vídeo.
+      </video>
+    </div>
+    {% endif %}
+  </main>
+
+  <footer>
+    <p>&copy; 2025 AutoDub - Todos os direitos reservados.</p>
+  </footer>
 </body>
 </html>
