@@ -48,24 +48,47 @@ def index():
 
 @app.route('/processar', methods=['POST'])
 def processar():
-    if 'video' not in request.files:
-        return redirect(request.url)
-    video_file = request.files['video']
-    if video_file.filename == '':
-        return redirect(request.url)
-    
-    if video_file:
-        video_filename = secure_filename(video_file.filename)
-        video_path = os.path.join(app.config['UPLOAD_FOLDER'], video_filename)
-        video_file.save(video_path)
+    try:
+        if 'video' not in request.files:
+            print("Erro: Nenhum vídeo enviado.")
+            return "Erro: Nenhum vídeo enviado.", 400
 
-        # Etapas do processamento
-        audio_path = extract_audio(video_path)
-        transcription = transcribe_audio(audio_path)
-        dubbed_audio_path = generate_dubbed_audio(transcription)
-        output_video_path = replace_audio_in_video(video_path, dubbed_audio_path)
+        video_file = request.files['video']
+        idioma = request.form['idioma']
+        if video_file.filename == '':
+            print("Erro: Nenhum arquivo selecionado.")
+            return "Erro: Nenhum arquivo selecionado.", 400
+        
+        print(f"Arquivo recebido: {video_file.filename}")
+        
+        if video_file:
+            video_filename = secure_filename(video_file.filename)
+            video_path = os.path.join(app.config['UPLOAD_FOLDER'], video_filename)
+            video_file.save(video_path)
 
-        return redirect(url_for('download', filename=output_video_path))
+            # Etapas de processamento
+            print("Extraindo áudio...")
+            audio_path = extract_audio(video_path)
+            print(f"Áudio extraído: {audio_path}")
+
+            print("Realizando transcrição...")
+            transcription = transcribe_audio(audio_path)
+            print(f"Transcrição: {transcription}")
+
+            print("Gerando áudio dublado...")
+            dubbed_audio_path = generate_dubbed_audio(transcription, lang=idioma)
+            print(f"Áudio dublado gerado: {dubbed_audio_path}")
+
+            print("Substituindo áudio no vídeo...")
+            output_video_path = replace_audio_in_video(video_path, dubbed_audio_path)
+            print(f"Vídeo final gerado: {output_video_path}")
+
+            return redirect(url_for('download', filename=output_video_path))
+
+    except Exception as e:
+        print(f"Erro durante o processamento: {str(e)}")
+        return f"Ocorreu um erro: {str(e)}", 500
+
 
 @app.route('/download/<filename>')
 def download(filename):
