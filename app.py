@@ -1,55 +1,57 @@
-from flask import Flask, render_template, request, send_file
-from gtts import gTTS
-import tempfile
-import os
-import subprocess
+from flask import Flask, render_template, request, jsonify
 import whisper
+import os
+from gtts import gTTS
+import ffmpeg
+import traceback
 
 app = Flask(__name__)
+
+# Carregando o modelo do Whisper
+model = whisper.load_model("base")  # Modelo 'base' do Whisper, ou outro modelo desejado
 
 @app.route('/')
 def index():
     return render_template('index.html')
 
-@app.route('/upload', methods=['POST'])
-def upload():
-    if 'video' not in request.files:
-        return 'No file part', 400
+@app.route('/processar', methods=['POST'])
+def processar():
+    try:
+        if 'video' not in request.files:
+            return jsonify({'error': 'Nenhum arquivo enviado.'}), 400
 
-    video = request.files['video']
-    language = request.form.get('language')
+        video_file = request.files['video']
 
-    if not video or video.filename == '':
-        return 'No selected file', 400
+        # Salva o arquivo temporariamente
+        video_path = os.path.join('/tmp', video_file.filename)
+        video_file.save(video_path)
 
-    with tempfile.TemporaryDirectory() as tmpdir:
-        video_path = os.path.join(tmpdir, 'input.mp4')
-        audio_path = os.path.join(tmpdir, 'audio.wav')
-        tts_path = os.path.join(tmpdir, 'tts.mp3')
-        output_path = os.path.join(tmpdir, 'output.mp4')
+        # Usar FFmpeg para extrair o áudio do vídeo
+        audio_path = '/tmp/audio.wav'
+        ffmpeg.input(video_path).output(audio_path).run()
 
-        video.save(video_path)
-
-        # Extrai áudio
-        subprocess.run(['ffmpeg', '-i', video_path, '-q:a', '0', '-map', 'a', audio_path], check=True)
-
-        # Transcreve com Whisper
-        model = whisper.load_model("base")
+        # Usar o modelo Whisper para transcrever o áudio
         result = model.transcribe(audio_path)
-        text = result['text']
+        texto_transcrito = result['text']
 
-        # TTS com gTTS
-        tts = gTTS(text=text, lang=language)
+        # Converter o texto transcrito para áudio com gTTS
+        tts = gTTS(texto_transcrito, lang='pt')
+        tts_path = '/tmp/audio_dublado.mp3'
         tts.save(tts_path)
 
-        # Combina vídeo + novo áudio
-        subprocess.run([
-            'ffmpeg', '-i', video_path, '-i', tts_path,
-            '-c:v', 'copy', '-map', '0:v:0', '-map', '1:a:0',
-            '-shortest', output_path
-        ], check=True)
+        # Deletar o arquivo de vídeo temporário
+        os.remove(video_path)
 
-        return send_file(output_path, as_attachment=True, download_name="dublado.mp4")
+        # Retornar o caminho do áudio gerado
+        return jsonify({'audio_dublado': tts_path})
+
+    except Exception as e:
+        # Captura e exibe o erro com traceback para depuração
+        error_message = str(e)
+        error_traceback = traceback.format_exc()
+        print(f"Erro: {error_message}")
+        print(f"Traceback: {error_traceback}")
+        return jsonify({'error': 'Erro interno do servidor, tente novamente mais tarde.'}), 500
 
 if __name__ == '__main__':
     app.run(debug=True)
