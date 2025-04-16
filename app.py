@@ -1,55 +1,74 @@
-from flask import Flask, render_template, request
-import os
 import whisper
 from gtts import gTTS
-import moviepy.editor as mp
+import subprocess
+import os
 
-app = Flask(__name__)
+# Função para extrair áudio do vídeo com ffmpeg
+def extract_audio(video_path, audio_path):
+    try:
+        subprocess.run(["ffmpeg", "-i", video_path, "-q:a", "0", "-map", "a", audio_path, "-y"], check=True)
+        print("🎧 Áudio extraído com sucesso!")
+    except subprocess.CalledProcessError as e:
+        print(f"❌ Erro ao extrair áudio: {e}")
+        raise
 
-UPLOAD_FOLDER = 'uploads'
-OUTPUT_FOLDER = 'static/videos'
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-os.makedirs(OUTPUT_FOLDER, exist_ok=True)
+# Função para transcrição de áudio usando Whisper
+def transcribe_audio(audio_path):
+    try:
+        model = whisper.load_model("base")
+        result = model.transcribe(audio_path)
+        return result["text"]
+    except Exception as e:
+        print(f"❌ Erro na transcrição do áudio: {e}")
+        raise
 
-@app.route('/')
-def index():
-    return render_template('index.html')
+# Função para gerar áudio dublado com gTTS
+def generate_dubbed_audio(text, dubbed_audio_path):
+    try:
+        tts = gTTS(text=text, lang='pt-br')
+        tts.save(dubbed_audio_path)
+        print("🎤 Áudio dublado gerado com sucesso!")
+    except Exception as e:
+        print(f"❌ Erro ao gerar áudio dublado: {e}")
+        raise
 
-@app.route('/processar', methods=['POST'])
-def processar():
-    video = request.files['video']
-    idioma = request.form.get('idioma', 'pt-br')  # Padrão pt-br
+# Função para substituir o áudio original pelo dublado no vídeo
+def replace_audio_in_video(video_path, dubbed_audio_path, output_path):
+    try:
+        subprocess.run([
+            "ffmpeg", "-i", video_path, "-i", dubbed_audio_path, "-c:v", "copy",
+            "-map", "0:v:0", "-map", "1:a:0", "-shortest", output_path, "-y"
+        ], check=True)
+        print(f"🎬 Vídeo dublado salvo em: {output_path}")
+    except subprocess.CalledProcessError as e:
+        print(f"❌ Erro ao substituir áudio no vídeo: {e}")
+        raise
 
-    if not video:
-        return "Nenhum vídeo enviado", 400
+# Função principal
+def dub_video(video_path, audio_path, dubbed_audio_path, output_path):
+    # 1. Extrair o áudio do vídeo
+    extract_audio(video_path, audio_path)
+    
+    # 2. Transcrição com Whisper
+    transcription = transcribe_audio(audio_path)
+    print("📝 Transcrição:", transcription)
+    
+    # 3. Gerar áudio dublado com gTTS
+    generate_dubbed_audio(transcription, dubbed_audio_path)
+    
+    # 4. Substituir áudio original pelo dublado
+    replace_audio_in_video(video_path, dubbed_audio_path, output_path)
+    
+    # 5. Limpeza de arquivos temporários
+    os.remove(audio_path)
+    os.remove(dubbed_audio_path)
+    print("🧹 Arquivos temporários removidos com sucesso!")
 
-    # Salvar vídeo
-    video_path = os.path.join(UPLOAD_FOLDER, video.filename)
-    video.save(video_path)
+# Caminhos dos arquivos
+video_path = "video.mp4"
+audio_path = "audio_original.wav"
+dubbed_audio_path = "audio_dublado.mp3"
+output_path = "video_dublado.mp4"
 
-    # Etapa 1: Extrair áudio do vídeo
-    clip = mp.VideoFileClip(video_path)
-    audio_path = os.path.join(UPLOAD_FOLDER, 'audio_original.wav')
-    clip.audio.write_audiofile(audio_path)
-
-    # Etapa 2: Transcrever com Whisper
-    model = whisper.load_model("base")
-    result = model.transcribe(audio_path)
-    transcription = result['text']
-
-    # Etapa 3: Gerar áudio dublado com gTTS
-    tts = gTTS(text=transcription, lang=idioma)
-    dubbed_audio_path = os.path.join(UPLOAD_FOLDER, 'audio_dublado.mp3')
-    tts.save(dubbed_audio_path)
-
-    # Etapa 4: Substituir áudio original pelo dublado
-    new_audio = mp.AudioFileClip(dubbed_audio_path)
-    final_clip = clip.set_audio(new_audio)
-
-    # Etapa 5: Exportar vídeo final
-    output_filename = f"dublado_{video.filename}"
-    output_path = os.path.join(OUTPUT_FOLDER, output_filename)
-    final_clip.write_videofile(output_path)
-
-    video_url = f"/static/videos/{output_filename}"
-    return render_template("index.html", video_url=video_url)
+# Iniciar o processo de dublagem
+dub_video(video_path, audio_path, dubbed_audio_path, output_path)
