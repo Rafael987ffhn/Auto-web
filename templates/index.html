@@ -1,32 +1,17 @@
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
-  <meta charset="UTF-8">
-  <title>AutoDub Web</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AutoDub - Dublagem de Vídeos</title>
 </head>
 <body>
-  <h1>🎤 AutoDub Web</h1>
+    <h1>Bem-vindo ao AutoDub!</h1>
+    <p>Faça o upload de seu vídeo para dublá-lo.</p>
 
-  <form action="/processar" method="post" enctype="multipart/form-data">
-    <label>Envie um vídeo:</label><br>
-    <input type="file" name="video" accept="video/*" required><br><br>
-    
-    <label>Idioma da dublagem:</label><br>
-    <select name="idioma">
-      <option value="pt-br">Português</option>
-      <option value="en">Inglês</option>
-      <option value="es">Espanhol</option>
-    </select><br><br>
-
-    <button type="submit">Dublar</button>
-  </form>
-
-  {% if video_url %}
-    <h2>✅ Vídeo Dublado:</h2>
-    <video controls width="640">
-      <source src="{{ video_url }}" type="video/mp4">
-      Seu navegador não suporta vídeos.
-    </video>
-  {% endif %}
+    <form action="/processar" method="POST" enctype="multipart/form-data">
+        <input type="file" name="video" accept="video/mp4" required><br><br>
+        <input type="submit" value="Dublar Vídeo">
+    </form>
 </body>
 </html>
