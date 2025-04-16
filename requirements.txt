@@ -1,0 +1,4 @@
+
+flask
+gtts
+ffmpeg-python
