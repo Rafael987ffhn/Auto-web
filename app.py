@@ -20,7 +20,6 @@ def extract_audio(video_path):
     cmd = ['ffmpeg', '-i', video_path, '-q:a', '0', '-map', 'a', audio_path, '-y']
     subprocess.run(cmd, check=True)
     return audio_path
-chmod -R 777 uploads/
 
 # Função para transcrição de áudio
 def transcribe_audio(audio_path):
