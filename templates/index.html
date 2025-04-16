@@ -1,52 +1,32 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-br">
 <head>
   <meta charset="UTF-8">
   <title>AutoDub Web</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      max-width: 600px;
-      margin: 50px auto;
-      padding: 20px;
-      background: #f5f5f5;
-      border-radius: 12px;
-      box-shadow: 0 0 10px rgba(0,0,0,0.1);
-    }
-    input, select, button {
-      display: block;
-      margin: 15px 0;
-      padding: 10px;
-      width: 100%;
-      font-size: 1em;
-    }
-    video {
-      margin-top: 20px;
-      max-width: 100%;
-    }
-  </style>
 </head>
 <body>
-  <h1>AutoDub Web</h1>
+  <h1>🎤 AutoDub Web</h1>
 
   <form action="/processar" method="post" enctype="multipart/form-data">
-    <label for="video">Envie um vídeo:</label>
-    <input type="file" name="video" id="video" accept="video/*" required>
-
-    <label for="idioma">Escolha o idioma de dublagem:</label>
-    <select name="idioma" id="idioma" required>
-      <option value="pt">Português</option>
+    <label>Envie um vídeo:</label><br>
+    <input type="file" name="video" accept="video/*" required><br><br>
+    
+    <label>Idioma da dublagem:</label><br>
+    <select name="idioma">
+      <option value="pt-br">Português</option>
       <option value="en">Inglês</option>
       <option value="es">Espanhol</option>
-      <option value="fr">Francês</option>
-    </select>
+    </select><br><br>
 
-    <button type="submit">Dublar vídeo</button>
+    <button type="submit">Dublar</button>
   </form>
 
   {% if video_url %}
-  <h2>Resultado:</h2>
-  <video controls src="{{ video_url }}"></video>
+    <h2>✅ Vídeo Dublado:</h2>
+    <video controls width="640">
+      <source src="{{ video_url }}" type="video/mp4">
+      Seu navegador não suporta vídeos.
+    </video>
   {% endif %}
 </body>
 </html>
