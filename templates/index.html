@@ -7,10 +7,21 @@
 </head>
 <body>
     <h1>Bem-vindo ao AutoDub!</h1>
-    <p>Faça o upload de seu vídeo para dublá-lo.</p>
+    <p>Faça o upload de seu vídeo e selecione o idioma da dublagem.</p>
 
     <form action="/processar" method="POST" enctype="multipart/form-data">
+        <label for="video">Escolha um vídeo para dublar:</label><br>
         <input type="file" name="video" accept="video/mp4" required><br><br>
+
+        <label for="idioma">Escolha o idioma da dublagem:</label><br>
+        <select name="idioma" required>
+            <option value="pt-br">Português (Brasil)</option>
+            <option value="en">Inglês</option>
+            <option value="es">Espanhol</option>
+            <option value="fr">Francês</option>
+            <option value="de">Alemão</option>
+        </select><br><br>
+
         <input type="submit" value="Dublar Vídeo">
     </form>
 </body>
