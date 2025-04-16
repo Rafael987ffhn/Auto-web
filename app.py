@@ -38,4 +38,31 @@ def processar():
             
             logging.info(f"Extrair áudio do vídeo: {video_path}")
             
-            command = ['ffmpeg', '-i', video_path, '-q:a', '0', '-map', 'a', audio_path, '-y']
+            try:
+                # Comando para extrair o áudio usando ffmpeg
+                command = ['ffmpeg', '-i', video_path, '-q:a', '0', '-map', 'a', audio_path, '-y']
+                process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                stdout, stderr = process.communicate()
+
+                if process.returncode != 0:
+                    logging.error(f"Erro ao extrair áudio: {stderr.decode()}")
+                    return jsonify({"error": "Erro ao extrair áudio"}), 500
+                
+                logging.info(f"Áudio extraído com sucesso para: {audio_path}")
+                
+                # Retorno de sucesso
+                return jsonify({"audio_file": audio_path, "success": "Audio extracted successfully"})
+
+            except Exception as e:
+                logging.error(f"Erro no subprocesso ffmpeg: {str(e)}")
+                return jsonify({"error": "Erro no processamento do áudio"}), 500
+
+        else:
+            return jsonify({"error": "Invalid file format"}), 400
+    
+    except Exception as e:
+        logging.error(f"Erro no processamento geral: {str(e)}")
+        return jsonify({"error": "Internal server error"}), 500
+
+if __name__ == "__main__":
+    app.run(debug=True, host='0.0.0.0', port=5000)
