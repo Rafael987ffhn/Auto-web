@@ -28,13 +28,17 @@ def processar():
 
         # Usar FFmpeg para extrair o áudio do vídeo
         audio_path = '/tmp/audio.wav'
-        ffmpeg.input(video_path).output(audio_path).run()
+        print(f"Processando o vídeo para extrair o áudio: {video_path}")
+        ffmpeg.input(video_path).output(audio_path, loglevel='debug').run()
 
         # Usar o modelo Whisper para transcrever o áudio
+        print("Transcrevendo o áudio...")
         result = model.transcribe(audio_path)
         texto_transcrito = result['text']
+        print(f"Texto transcrito: {texto_transcrito}")
 
         # Converter o texto transcrito para áudio com gTTS
+        print("Convertendo texto para áudio dublado...")
         tts = gTTS(texto_transcrito, lang='pt')
         tts_path = '/tmp/audio_dublado.mp3'
         tts.save(tts_path)
