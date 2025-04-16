@@ -1,70 +1,55 @@
+from flask import Flask, render_template, request, send_file
+from gtts import gTTS
+import tempfile
 import os
 import subprocess
-import logging
-from flask import Flask, request, jsonify
-from werkzeug.utils import secure_filename
+import whisper
 
 app = Flask(__name__)
 
-# Configurações
-UPLOAD_FOLDER = 'uploads'
-ALLOWED_EXTENSIONS = {'mp4', 'mov', 'avi'}
-app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+@app.route('/')
+def index():
+    return render_template('index.html')
 
-# Logs
-logging.basicConfig(level=logging.DEBUG)
+@app.route('/upload', methods=['POST'])
+def upload():
+    if 'video' not in request.files:
+        return 'No file part', 400
 
-# Verifica extensão permitida
-def allowed_file(filename):
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+    video = request.files['video']
+    language = request.form.get('language')
 
-# Rota principal
-@app.route('/processar', methods=['POST'])
-def processar():
-    try:
-        if 'video' not in request.files:
-            return jsonify({"error": "Nenhum arquivo de vídeo enviado"}), 400
+    if not video or video.filename == '':
+        return 'No selected file', 400
 
-        video = request.files['video']
-        if video.filename == '':
-            return jsonify({"error": "Arquivo sem nome"}), 400
+    with tempfile.TemporaryDirectory() as tmpdir:
+        video_path = os.path.join(tmpdir, 'input.mp4')
+        audio_path = os.path.join(tmpdir, 'audio.wav')
+        tts_path = os.path.join(tmpdir, 'tts.mp3')
+        output_path = os.path.join(tmpdir, 'output.mp4')
 
-        if video and allowed_file(video.filename):
-            filename = secure_filename(video.filename)
-            video_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-            video.save(video_path)
+        video.save(video_path)
 
-            # Caminho do áudio
-            audio_filename = "audio_original.wav"
-            audio_path = os.path.join(app.config['UPLOAD_FOLDER'], audio_filename)
+        # Extrai áudio
+        subprocess.run(['ffmpeg', '-i', video_path, '-q:a', '0', '-map', 'a', audio_path], check=True)
 
-            logging.info(f"Extraindo áudio do vídeo: {video_path}")
+        # Transcreve com Whisper
+        model = whisper.load_model("base")
+        result = model.transcribe(audio_path)
+        text = result['text']
 
-            try:
-                command = ['ffmpeg', '-i', video_path, '-q:a', '0', '-map', 'a', audio_path, '-y']
-                process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                stdout, stderr = process.communicate()
+        # TTS com gTTS
+        tts = gTTS(text=text, lang=language)
+        tts.save(tts_path)
 
-                if process.returncode != 0:
-                    logging.error(f"Erro ao extrair áudio: {stderr.decode()}")
-                    return jsonify({"error": "Erro ao extrair áudio"}), 500
+        # Combina vídeo + novo áudio
+        subprocess.run([
+            'ffmpeg', '-i', video_path, '-i', tts_path,
+            '-c:v', 'copy', '-map', '0:v:0', '-map', '1:a:0',
+            '-shortest', output_path
+        ], check=True)
 
-                logging.info(f"Áudio extraído com sucesso: {audio_path}")
-                return jsonify({"audio_file": audio_path, "success": "Áudio extraído com sucesso"})
+        return send_file(output_path, as_attachment=True, download_name="dublado.mp4")
 
-            except Exception as e:
-                logging.error(f"Erro ao rodar ffmpeg: {str(e)}")
-                return jsonify({"error": "Erro ao processar áudio"}), 500
-
-        else:
-            return jsonify({"error": "Formato de vídeo inválido"}), 400
-
-    except Exception as e:
-        logging.error(f"Erro geral: {str(e)}")
-        return jsonify({"error": "Erro interno no servidor"}), 500
-
-# Inicialização da aplicação
-if __name__ == "__main__":
-    app.run(debug=True, host='0.0.0.0', port=5000)
+if __name__ == '__main__':
+    app.run(debug=True)
