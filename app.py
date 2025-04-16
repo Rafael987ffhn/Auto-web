@@ -5,6 +5,38 @@ import logging
 from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
+from flask import Flask, request, jsonify
+import os
+
+app = Flask(__name__)
+UPLOAD_FOLDER = 'uploads'
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+@app.route('/processar', methods=['POST'])
+def processar():
+    try:
+        if 'video' not in request.files:
+            return jsonify({"error": "Nenhum arquivo de vídeo enviado"}), 400
+
+        video = request.files['video']
+        if video.filename == '':
+            return jsonify({"error": "Nome do arquivo vazio"}), 400
+
+        # Salva o arquivo com nome seguro
+        video_path = os.path.join(UPLOAD_FOLDER, video.filename)
+        video.save(video_path)
+
+        # Aqui você pode chamar o processamento, por exemplo:
+        # audio_path = processar_video(video_path)
+
+        return jsonify({"video_file": video.filename, "success": "Vídeo enviado com sucesso"})
+    
+    except Exception as e:
+        app.logger.error(f"Erro no processamento geral: {e}")
+        return jsonify({"error": str(e)}), 500
+
+if __name__ == '__main__':
+    app.run(debug=True, port=10000)  # Porta correta detectada pela Render
 
 # Configurar o diretório para uploads e log de erros
 UPLOAD_FOLDER = 'uploads'
