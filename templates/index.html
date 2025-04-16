@@ -3,26 +3,25 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AutoDub - Dublagem de Vídeos</title>
+    <title>AutoDub - Upload de Vídeo</title>
 </head>
 <body>
-    <h1>Bem-vindo ao AutoDub!</h1>
-    <p>Faça o upload de seu vídeo e selecione o idioma da dublagem.</p>
-
+    <h1>Upload de Vídeo</h1>
     <form action="/processar" method="POST" enctype="multipart/form-data">
-        <label for="video">Escolha um vídeo para dublar:</label><br>
-        <input type="file" name="video" accept="video/mp4" required><br><br>
+        <label for="video">Escolha o vídeo:</label>
+        <input type="file" name="video" id="video" accept=".mp4,.avi,.mov,.mkv" required><br><br>
+        <input type="submit" value="Enviar">
+    </form>
 
-        <label for="idioma">Escolha o idioma da dublagem:</label><br>
-        <select name="idioma" required>
-            <option value="pt-br">Português (Brasil)</option>
-            <option value="en">Inglês</option>
-            <option value="es">Espanhol</option>
-            <option value="fr">Francês</option>
-            <option value="de">Alemão</option>
+    <h2>Selecionar Idioma para a Dublagem</h2>
+    <form action="/selecionar_idioma" method="POST">
+        <label for="idioma">Escolha o idioma:</label>
+        <select name="idioma" id="idioma" required>
+            <option value="portugues">Português</option>
+            <option value="ingles">Inglês</option>
+            <option value="espanhol">Espanhol</option>
         </select><br><br>
-
-        <input type="submit" value="Dublar Vídeo">
+        <input type="submit" value="Selecionar Idioma">
     </form>
 </body>
 </html>
