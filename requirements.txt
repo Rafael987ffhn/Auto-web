@@ -2,4 +2,4 @@ gunicorn
 flask
 gtts
 ffmpeg-python
-whisper
+openai-whisper
