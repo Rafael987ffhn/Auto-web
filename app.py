@@ -1,43 +1,37 @@
-
-from flask import Flask, request, render_template, send_file
-from gtts import gTTS
-import ffmpeg
+from flask import Flask, render_template, request, send_file
 import os
-import uuid
 
 app = Flask(__name__)
 
-UPLOAD_FOLDER = "uploads"
-OUTPUT_FOLDER = "outputs"
+UPLOAD_FOLDER = 'uploads'
+PROCESSED_FOLDER = 'static/videos'
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-os.makedirs(OUTPUT_FOLDER, exist_ok=True)
+os.makedirs(PROCESSED_FOLDER, exist_ok=True)
 
-@app.route("/", methods=["GET", "POST"])
+@app.route('/')
 def index():
-    if request.method == "POST":
-        video = request.files["video"]
-        text = request.form["text"]
+    return render_template('index.html')
 
-        if not video or not text:
-            return "Faltam dados", 400
+@app.route('/processar', methods=['POST'])
+def processar():
+    video = request.files['video']
+    idioma = request.form['idioma']
 
-        video_filename = os.path.join(UPLOAD_FOLDER, str(uuid.uuid4()) + "_" + video.filename)
-        video.save(video_filename)
+    if not video:
+        return "Nenhum vídeo enviado", 400
 
-        tts = gTTS(text=text, lang="pt-br")
-        audio_filename = os.path.join(OUTPUT_FOLDER, str(uuid.uuid4()) + "_audio.mp3")
-        tts.save(audio_filename)
+    # Salvar vídeo temporariamente
+    caminho_video = os.path.join(UPLOAD_FOLDER, video.filename)
+    video.save(caminho_video)
 
-        output_filename = os.path.join(OUTPUT_FOLDER, str(uuid.uuid4()) + "_output.mp4")
+    # Aqui você chamaria a função principal para dublar (vou simular)
+    nome_saida = f"dublado_{video.filename}"
+    caminho_saida = os.path.join(PROCESSED_FOLDER, nome_saida)
 
-        (
-            ffmpeg
-            .input(video_filename)
-            .input(audio_filename)
-            .output(output_filename, vcodec='copy', acodec='aac', strict='experimental')
-            .run()
-        )
+    # Simulação da dublagem: copiar o vídeo original
+    # No seu projeto, substitua essa parte com a função de dublagem real
+    import shutil
+    shutil.copy(caminho_video, caminho_saida)
 
-        return send_file(output_filename, as_attachment=True)
-
-    return render_template("index.html")
+    video_url = f"/static/videos/{nome_saida}"
+    return render_template('index.html', video_url=video_url)
