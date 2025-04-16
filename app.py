@@ -1,129 +1,67 @@
 import os
 import subprocess
-from flask import Flask, render_template, request, redirect, url_for
-import whisper
-from gtts import gTTS
+from flask import Flask, render_template, request, jsonify
 from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
-if __name__ == '__main__':
-    app.run(debug=True)
 
-# Caminho para salvar vídeos e áudios
+# Definir diretório para upload
 UPLOAD_FOLDER = 'uploads'
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
-# Função para extrair o áudio do vídeo
-def extract_audio(video_path):
-    audio_path = os.path.join(UPLOAD_FOLDER, "audio_original.wav")
-    cmd = ['ffmpeg', '-i', video_path, '-q:a', '0', '-map', 'a', audio_path, '-y']
-    subprocess.run(cmd, check=True)
-    return audio_path
+# Limitar o tipo de arquivos aceitos
+ALLOWED_EXTENSIONS = {'mp4', 'avi', 'mov', 'mkv'}
 
-# Função para transcrição de áudio
-def transcribe_audio(audio_path):
-    model = whisper.load_model("base")  # ou "tiny" para mais rápido
-    result = model.transcribe(audio_path)
-    return result["text"]
+# Função para verificar extensões de arquivos permitidos
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-# Função para gerar áudio dublado
-def generate_dubbed_audio(text, lang='pt-br'):
-    tts = gTTS(text=text, lang=lang)
-    dubbed_audio_path = os.path.join(UPLOAD_FOLDER, "audio_dublado.mp3")
-    tts.save(dubbed_audio_path)
-    return dubbed_audio_path
-
-# Função para substituir o áudio do vídeo
-def replace_audio_in_video(video_path, dubbed_audio_path):
-    output_video_path = os.path.join(UPLOAD_FOLDER, "video_dublado.mp4")
-    cmd = ['ffmpeg', '-i', video_path, '-i', dubbed_audio_path, '-c:v', 'copy', '-c:a', 'aac', '-strict', 'experimental', output_video_path]
-    subprocess.run(cmd, check=True)
-    return output_video_path
-
+# Rota para a página inicial (upload do vídeo)
 @app.route('/')
 def index():
     return render_template('index.html')
 
+# Rota para processar o vídeo
 @app.route('/processar', methods=['POST'])
 def processar():
-    try:
-        if 'video' not in request.files:
-            print("Erro: Nenhum vídeo enviado.")
-            return "Erro: Nenhum vídeo enviado.", 400
+    if 'video' not in request.files:
+        return jsonify({'error': 'No file part'}), 400
 
-        video_file = request.files['video']
-        idioma = request.form['idioma']
-        if video_file.filename == '':
-            print("Erro: Nenhum arquivo selecionado.")
-            return "Erro: Nenhum arquivo selecionado.", 400
-        
-        print(f"Arquivo recebido: {video_file.filename}")
-        
-        if video_file:
-            video_filename = secure_filename(video_file.filename)
-            video_path = os.path.join(app.config['UPLOAD_FOLDER'], video_filename)
-            video_file.save(video_path)
+    video_file = request.files['video']
+    
+    if video_file.filename == '':
+        return jsonify({'error': 'No selected file'}), 400
+    
+    if video_file and allowed_file(video_file.filename):
+        filename = secure_filename(video_file.filename)
+        video_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        video_file.save(video_path)
 
-            # Etapas de processamento
-            print("Extraindo áudio...")
-            audio_path = extract_audio(video_path)
-            print(f"Áudio extraído: {audio_path}")
+        # Extrair áudio do vídeo usando FFmpeg
+        audio_path = os.path.join(app.config['UPLOAD_FOLDER'], 'audio_original.wav')
+        try:
+            # Executar o comando FFmpeg para extrair o áudio
+            subprocess.run(
+                ['ffmpeg', '-i', video_path, '-q:a', '0', '-map', 'a', audio_path, '-y'],
+                check=True
+            )
+            return jsonify({'success': 'Audio extracted successfully', 'audio_file': audio_path}), 200
+        except subprocess.CalledProcessError as e:
+            return jsonify({'error': f'Error extracting audio: {e}'}), 500
+    else:
+        return jsonify({'error': 'Invalid file type. Only mp4, avi, mov, and mkv are allowed.'}), 400
 
-            print("Realizando transcrição...")
-            transcription = transcribe_audio(audio_path)
-            print(f"Transcrição: {transcription}")
-
-            print("Gerando áudio dublado...")
-            dubbed_audio_path = generate_dubbed_audio(transcription, lang=idioma)
-            print(f"Áudio dublado gerado: {dubbed_audio_path}")
-
-            print("Substituindo áudio no vídeo...")
-            output_video_path = replace_audio_in_video(video_path, dubbed_audio_path)
-            print(f"Vídeo final gerado: {output_video_path}")
-
-            return redirect(url_for('download', filename=output_video_path))
-
-    except Exception as e:
-        print(f"Erro durante o processamento: {str(e)}")
-        return f"Ocorreu um erro: {str(e)}", 500
-
-
-@app.route('/download/<filename>')
-def download(filename):
-    return redirect(url_for('static', filename=filename))
+# Rota para selecionar o idioma da dublagem
+@app.route('/selecionar_idioma', methods=['POST'])
+def selecionar_idioma():
+    idioma = request.form.get('idioma')
+    if not idioma:
+        return jsonify({'error': 'Idioma não selecionado'}), 400
+    
+    # Aqui você pode adicionar a lógica para processar a dublagem, usando o idioma selecionado.
+    # Exemplo de processamento fictício:
+    return jsonify({'success': f'Idioma {idioma} selecionado para a dublagem.'}), 200
 
 if __name__ == '__main__':
     app.run(debug=True)
-@app.route('/processar', methods=['POST'])
-def processar():
-    try:
-        if 'video' not in request.files:
-            print("Erro: Nenhum vídeo enviado.")
-            return redirect(request.url)
-
-        video_file = request.files['video']
-        idioma = request.form['idioma']
-        if video_file.filename == '':
-            print("Erro: Nenhum arquivo selecionado.")
-            return redirect(request.url)
-        
-        print("Arquivo recebido:", video_file.filename)
-        
-        if video_file:
-            video_filename = secure_filename(video_file.filename)
-            video_path = os.path.join(app.config['UPLOAD_FOLDER'], video_filename)
-            video_file.save(video_path)
-
-            # Etapas do processamento
-            audio_path = extract_audio(video_path)
-            transcription = transcribe_audio(audio_path)
-            dubbed_audio_path = generate_dubbed_audio(transcription, lang=idioma)
-            output_video_path = replace_audio_in_video(video_path, dubbed_audio_path)
-
-            print("Vídeo dublado gerado com sucesso.")
-            return redirect(url_for('download', filename=output_video_path))
-
-    except Exception as e:
-        print("Erro durante o processamento:", str(e))
-        return "Ocorreu um erro durante o processamento. Tente novamente mais tarde.", 500
