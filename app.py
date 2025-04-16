@@ -6,6 +6,8 @@ from gtts import gTTS
 from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
+if __name__ == '__main__':
+    app.run(debug=True)
 
 # Caminho para salvar vídeos e áudios
 UPLOAD_FOLDER = 'uploads'
@@ -18,6 +20,7 @@ def extract_audio(video_path):
     cmd = ['ffmpeg', '-i', video_path, '-q:a', '0', '-map', 'a', audio_path, '-y']
     subprocess.run(cmd, check=True)
     return audio_path
+chmod -R 777 uploads/
 
 # Função para transcrição de áudio
 def transcribe_audio(audio_path):
@@ -70,3 +73,35 @@ def download(filename):
 
 if __name__ == '__main__':
     app.run(debug=True)
+@app.route('/processar', methods=['POST'])
+def processar():
+    try:
+        if 'video' not in request.files:
+            print("Erro: Nenhum vídeo enviado.")
+            return redirect(request.url)
+
+        video_file = request.files['video']
+        idioma = request.form['idioma']
+        if video_file.filename == '':
+            print("Erro: Nenhum arquivo selecionado.")
+            return redirect(request.url)
+        
+        print("Arquivo recebido:", video_file.filename)
+        
+        if video_file:
+            video_filename = secure_filename(video_file.filename)
+            video_path = os.path.join(app.config['UPLOAD_FOLDER'], video_filename)
+            video_file.save(video_path)
+
+            # Etapas do processamento
+            audio_path = extract_audio(video_path)
+            transcription = transcribe_audio(audio_path)
+            dubbed_audio_path = generate_dubbed_audio(transcription, lang=idioma)
+            output_video_path = replace_audio_in_video(video_path, dubbed_audio_path)
+
+            print("Vídeo dublado gerado com sucesso.")
+            return redirect(url_for('download', filename=output_video_path))
+
+    except Exception as e:
+        print("Erro durante o processamento:", str(e))
+        return "Ocorreu um erro durante o processamento. Tente novamente mais tarde.", 500
