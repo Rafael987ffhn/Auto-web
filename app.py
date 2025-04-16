@@ -1,53 +1,24 @@
 import os
 import subprocess
-from flask import Flask, request, jsonify
 import logging
+from flask import Flask, request, jsonify
 from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
-from flask import Flask, request, jsonify
-import os
 
-app = Flask(__name__)
-UPLOAD_FOLDER = 'uploads'
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-
-@app.route('/processar', methods=['POST'])
-def processar():
-    try:
-        if 'video' not in request.files:
-            return jsonify({"error": "Nenhum arquivo de vídeo enviado"}), 400
-
-        video = request.files['video']
-        if video.filename == '':
-            return jsonify({"error": "Nome do arquivo vazio"}), 400
-
-        # Salva o arquivo com nome seguro
-        video_path = os.path.join(UPLOAD_FOLDER, video.filename)
-        video.save(video_path)
-
-        # Aqui você pode chamar o processamento, por exemplo:
-        # audio_path = processar_video(video_path)
-
-        return jsonify({"video_file": video.filename, "success": "Vídeo enviado com sucesso"})
-    
-    except Exception as e:
-        app.logger.error(f"Erro no processamento geral: {e}")
-        return jsonify({"error": str(e)}), 500
-
-if __name__ == '__main__':
-    app.run(debug=True, port=10000)  # Porta correta detectada pela Render
-
-# Configurar o diretório para uploads e log de erros
+# Configurações
 UPLOAD_FOLDER = 'uploads'
 ALLOWED_EXTENSIONS = {'mp4', 'mov', 'avi'}
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB
+
+# Cria a pasta de uploads se não existir
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 # Configuração de logs
 logging.basicConfig(level=logging.DEBUG)
 
-# Função para verificar se o arquivo tem uma extensão permitida
+# Verifica se a extensão do arquivo é permitida
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
@@ -55,46 +26,45 @@ def allowed_file(filename):
 def processar():
     try:
         if 'video' not in request.files:
-            return jsonify({"error": "No video file part"}), 400
+            return jsonify({"error": "Nenhum arquivo de vídeo enviado"}), 400
+        
         video = request.files['video']
         if video.filename == '':
-            return jsonify({"error": "No selected file"}), 400
+            return jsonify({"error": "Nome do arquivo vazio"}), 400
+        
         if video and allowed_file(video.filename):
             filename = secure_filename(video.filename)
             video_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
             video.save(video_path)
 
-            # Extração do áudio
+            # Caminho do áudio extraído
             audio_filename = "audio_original.wav"
             audio_path = os.path.join(app.config['UPLOAD_FOLDER'], audio_filename)
             
-            logging.info(f"Extrair áudio do vídeo: {video_path}")
+            logging.info(f"Extraindo áudio do vídeo: {video_path}")
             
-            try:
-                # Comando para extrair o áudio usando ffmpeg
-                command = ['ffmpeg', '-i', video_path, '-q:a', '0', '-map', 'a', audio_path, '-y']
-                process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                stdout, stderr = process.communicate()
+            # Comando FFmpeg para extrair o áudio
+            command = ['ffmpeg', '-i', video_path, '-q:a', '0', '-map', 'a', audio_path, '-y']
+            process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            stdout, stderr = process.communicate()
 
-                if process.returncode != 0:
-                    logging.error(f"Erro ao extrair áudio: {stderr.decode()}")
-                    return jsonify({"error": "Erro ao extrair áudio"}), 500
-                
-                logging.info(f"Áudio extraído com sucesso para: {audio_path}")
-                
-                # Retorno de sucesso
-                return jsonify({"audio_file": audio_path, "success": "Audio extracted successfully"})
-
-            except Exception as e:
-                logging.error(f"Erro no subprocesso ffmpeg: {str(e)}")
-                return jsonify({"error": "Erro no processamento do áudio"}), 500
+            if process.returncode != 0:
+                logging.error(f"Erro ao extrair áudio: {stderr.decode()}")
+                return jsonify({"error": "Erro ao extrair áudio"}), 500
+            
+            logging.info(f"Áudio extraído com sucesso para: {audio_path}")
+            return jsonify({
+                "video_file": filename,
+                "audio_file": audio_filename,
+                "success": "Áudio extraído com sucesso"
+            })
 
         else:
-            return jsonify({"error": "Invalid file format"}), 400
-    
-    except Exception as e:
-        logging.error(f"Erro no processamento geral: {str(e)}")
-        return jsonify({"error": "Internal server error"}), 500
+            return jsonify({"error": "Formato de arquivo inválido"}), 400
 
-if __name__ == "__main__":
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    except Exception as e:
+        logging.error(f"Erro no processamento: {str(e)}")
+        return jsonify({"error": "Erro interno no servidor"}), 500
+
+if __name__ == '__main__':
+    # Para a Render, use host='0.0.0.0' e
